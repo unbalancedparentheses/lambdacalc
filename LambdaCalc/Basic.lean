@@ -19,7 +19,7 @@ inductive Term where
   | var : Nat -> Term           -- Variable (de Bruijn index)
   | lam : Term -> Term          -- Lambda abstraction
   | app : Term -> Term -> Term  -- Application
-  deriving Repr, BEq, Inhabited
+  deriving Repr, BEq, Inhabited, DecidableEq
 
 open Term
 
@@ -265,6 +265,47 @@ def betaEtaReduce (fuel : Nat) (t : Term) : Term :=
 def isBetaEtaNormalForm (t : Term) : Bool :=
   betaEtaReduceStep t == none
 
+/-
+  Call-by-Value Reduction
+
+  In call-by-value, we only reduce (λx. body) arg when arg is a value.
+  Values are: variables and lambda abstractions (not applications).
+-/
+
+/-- Check if a term is a value (for call-by-value semantics) -/
+def isValue : Term -> Bool
+  | var _ => true
+  | lam _ => true
+  | app _ _ => false
+
+/-- Single step call-by-value reduction -/
+def cbvReduceStep : Term -> Option Term
+  | app (lam body) arg =>
+    if isValue arg then
+      some (subst 0 arg body)  -- Only reduce if arg is a value
+    else
+      match cbvReduceStep arg with
+      | some arg' => some (app (lam body) arg')
+      | none => none
+  | app t1 t2 =>
+    match cbvReduceStep t1 with
+    | some t1' => some (app t1' t2)
+    | none =>
+      match cbvReduceStep t2 with
+      | some t2' => some (app t1 t2')
+      | none => none
+  | lam _ => none  -- Don't reduce under lambdas in CBV
+  | var _ => none
+
+/-- Reduce to value using call-by-value with fuel limit -/
+def cbvReduce (fuel : Nat) (t : Term) : Term :=
+  match fuel with
+  | 0 => t
+  | fuel' + 1 =>
+    match cbvReduceStep t with
+    | some t' => cbvReduce fuel' t'
+    | none => t
+
 /-- Eta reduce and return trace -/
 def etaReduceWithTrace (fuel : Nat) (t : Term) : List Term :=
   match fuel with
@@ -435,6 +476,20 @@ def churchEq : Term :=
 -- Church greater-than: λm. λn. not (leq m n)
 def churchGt : Term :=
   lam (lam (app churchNot (app (app churchLeq (var 1)) (var 0))))
+
+-- Church min: λm. λn. if (leq m n) then m else n
+def churchMin : Term :=
+  lam (lam (app (app (app churchIf
+    (app (app churchLeq (var 1)) (var 0)))
+    (var 1))
+    (var 0)))
+
+-- Church max: λm. λn. if (leq m n) then n else m
+def churchMax : Term :=
+  lam (lam (app (app (app churchIf
+    (app (app churchLeq (var 1)) (var 0)))
+    (var 0))
+    (var 1)))
 
 /-
   Combinators
@@ -629,6 +684,57 @@ def scottNth : Term :=
     (lam (lam (lam (app (app (var 0) churchZero)
       (lam (lam (app (app (app churchIsZero (var 3)) (var 1))
         (app (app (var 4) (app churchPred (var 3))) (var 0)))))))))
+
+/-
+  SKI Combinator Translation
+
+  Convert lambda terms to SKI combinator terms using bracket abstraction.
+  This is the classic translation from lambda calculus to combinatory logic.
+
+  Rules:
+  - [x] x = I
+  - [x] N = K N  (when x not free in N)
+  - [x] (M N) = S ([x] M) ([x] N)
+-/
+
+/-- Check if variable n is free in term (for SKI translation) -/
+def freeInSKI (n : Nat) : Term -> Bool
+  | Term.var m => m == n
+  | Term.lam body => freeInSKI (n + 1) body
+  | Term.app t1 t2 => freeInSKI n t1 || freeInSKI n t2
+
+/-- Adjust variable indices after removing a binder (for SKI translation) -/
+def adjustVarsSKI (depth : Nat) : Term -> Term
+  | Term.var n => if n > depth then var (n - 1) else var n
+  | Term.lam body => lam (adjustVarsSKI (depth + 1) body)
+  | Term.app t1 t2 => app (adjustVarsSKI depth t1) (adjustVarsSKI depth t2)
+
+/-- Eliminate a single variable binding, producing an SKI term -/
+partial def eliminateSKI (depth : Nat) : Term -> Term
+  | Term.var n =>
+    if n == depth then idCombinator
+    else if n > depth then app kCombinator (var (n - 1))
+    else app kCombinator (var n)
+  | Term.lam body =>
+    -- First eliminate inner lambda, then the outer variable
+    let inner := eliminateSKI (depth + 1) body
+    eliminateSKI depth (lam inner)
+  | Term.app t1 t2 =>
+    if !freeInSKI depth (app t1 t2) then
+      app kCombinator (app (adjustVarsSKI depth t1) (adjustVarsSKI depth t2))
+    else
+      app (app sCombinator (eliminateSKI depth t1)) (eliminateSKI depth t2)
+
+/-- Bracket abstraction: eliminate the outermost lambda using SKI combinators -/
+def bracketAbstract : Term -> Term
+  | Term.lam body => eliminateSKI 0 body
+  | t => t
+
+/-- Convert a lambda term to SKI combinators -/
+partial def toSKI : Term -> Term
+  | Term.var n => var n
+  | Term.lam body => bracketAbstract (lam (toSKI body))
+  | Term.app t1 t2 => app (toSKI t1) (toSKI t2)
 
 /-
   Utility functions for testing

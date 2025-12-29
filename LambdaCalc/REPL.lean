@@ -52,6 +52,7 @@ def builtins : List (String × Term) := [
   ("add", churchAdd), ("mul", churchMult), ("exp", churchExp), ("sub", churchSub),
   -- Comparisons
   ("zero?", churchIsZero), ("leq", churchLeq), ("eq", churchEq), ("gt", churchGt),
+  ("min", churchMin), ("max", churchMax),
   -- Pairs
   ("pair", churchPair), ("fst", churchFst), ("snd", churchSnd),
   -- Fixed-point combinators
@@ -188,6 +189,7 @@ def parse (input : String) : Except String Term :=
 
 inductive Cmd | reduce (t : String) | step (t : String) | trace (t : String)
              | show (t : String) | showType (n : String) | list | help | quit | eval (t : String)
+             | cbv (t : String) | ski (t : String)
 
 def parseCmd (s : String) : Cmd :=
   let s := s.trim
@@ -196,6 +198,8 @@ def parseCmd (s : String) : Cmd :=
   else if s.startsWith ":trace " then .trace (s.drop 7)
   else if s.startsWith ":parse " then .show (s.drop 7)
   else if s.startsWith ":type " then .showType (s.drop 6)
+  else if s.startsWith ":cbv " then .cbv (s.drop 5)
+  else if s.startsWith ":ski " then .ski (s.drop 5)
   else if s == ":list" then .list
   else if s == ":help" || s == ":h" then .help
   else if s == ":quit" || s == ":q" then .quit
@@ -230,8 +234,22 @@ def execCmd (c : Cmd) : IO String := do
     match lookupBuiltin n with
     | some t => return s!"{n} = {prettyPrint t}"
     | none => return s!"Unknown: {n}"
-  | .list => return "Built-ins:\n  Combinators: I K S B C W\n  Booleans: true false and or not if\n  Arithmetic: succ pred add mul exp sub\n  Comparisons: zero? leq eq gt\n  Pairs: pair fst snd\n  Fixed-point: Y Z theta\n  Recursive: factorial fib\n  Lists: nil cons null? head tail length append map foldr reverse sum product nth\n  Divergence: omega Omega\n  Numerals: 0, 1, 2, ..."
-  | .help => return "Lambda Calculus REPL\n\nSyntax:\n  λx. body  or  \\x. body\n  f x (application)\n  (term)\n\nCommands:\n  :reduce <term>  Reduce to normal form\n  :step <term>    Single step\n  :trace <term>   Show trace\n  :parse <term>   Show de Bruijn\n  :type <name>    Show built-in\n  :list           List built-ins\n  :help           This help\n  :quit           Exit\n\nExamples:\n  (\\x. x) I\n  add 2 3\n  :trace K I omega"
+  | .cbv ts =>
+    match parse ts with
+    | .error e => return s!"Parse error: {e}"
+    | .ok t =>
+      let r := cbvReduce 1000 t
+      let pp := prettyPrint r
+      match recognizeNum r, recognizeBool r with
+      | some n, _ => return s!"{pp}  (= {n})"
+      | _, some b => return s!"{pp}  (= {b})"
+      | _, _ => return pp
+  | .ski ts =>
+    match parse ts with
+    | .error e => return s!"Parse error: {e}"
+    | .ok t => return s!"{prettyPrint (toSKI t)}"
+  | .list => return "Built-ins:\n  Combinators: I K S B C W\n  Booleans: true false and or not if\n  Arithmetic: succ pred add mul exp sub\n  Comparisons: zero? leq eq gt min max\n  Pairs: pair fst snd\n  Fixed-point: Y Z theta\n  Recursive: factorial fib\n  Lists: nil cons null? head tail length append map foldr reverse sum product nth\n  Divergence: omega Omega\n  Numerals: 0, 1, 2, ..."
+  | .help => return "Lambda Calculus REPL\n\nSyntax:\n  λx. body  or  \\x. body\n  f x (application)\n  (term)\n\nCommands:\n  :reduce <term>  Reduce to normal form (call-by-name)\n  :cbv <term>     Reduce using call-by-value\n  :step <term>    Single reduction step\n  :trace <term>   Show reduction trace\n  :ski <term>     Convert to SKI combinators\n  :parse <term>   Show de Bruijn representation\n  :type <name>    Show built-in definition\n  :list           List all built-ins\n  :help           This help\n  :quit           Exit\n\nExamples:\n  (\\x. x) I\n  add 2 3\n  :trace K I omega\n  :ski \\x. \\y. x"
   | .quit => return ""
   | .eval ts =>
     if ts.isEmpty then return ""
