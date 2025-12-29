@@ -123,13 +123,25 @@ theorem AlphaEquiv.eq : ∀ t1 t2, AlphaEquiv t1 t2 -> t1 = t2
   Shifting and Substitution
 -/
 
-/-- Shift all free variables (with index >= cutoff) by delta -/
+/-- Shift all free variables (with index >= cutoff) by delta.
+
+    PRECONDITION: For any variable `n >= cutoff`, we must have `n + delta >= 0`.
+    If this precondition is violated, the behavior is undefined (Int.toNat maps
+    negative values to 0, which may produce incorrect terms).
+
+    This is safe when:
+    - delta >= 0 (always safe)
+    - delta < 0 and all free variables have index >= |delta| relative to cutoff
+-/
 def shift (delta : Int) (cutoff : Nat) : Term -> Term
   | var n =>
     if n >= cutoff then
-      var (Int.toNat (n + delta))  -- shift free variable
+      let newIdx := n + delta
+      -- Debug assertion: uncomment to catch precondition violations during development
+      -- if newIdx < 0 then dbg_trace "WARNING: shift produced negative index!"
+      var (Int.toNat newIdx)
     else
-      var n                         -- bound variable unchanged
+      var n  -- bound variable unchanged
   | lam body => lam (shift delta (cutoff + 1) body)
   | app t1 t2 => app (shift delta cutoff t1) (shift delta cutoff t2)
 

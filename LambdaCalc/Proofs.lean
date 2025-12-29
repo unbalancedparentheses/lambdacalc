@@ -372,11 +372,33 @@ theorem AlphaEquiv_app (f1 a1 f2 a2 : Term) :
 ## Closed Term Properties
 -/
 
+/-- Helper: if isClosed.go returns true, freeVars.go returns empty list -/
+theorem isClosed_go_implies_freeVars_go_empty (t : Term) (d : Nat) :
+    isClosed.go d t = true → freeVars.go d t = [] := by
+  induction t generalizing d with
+  | var n =>
+    simp only [isClosed.go, freeVars.go, decide_eq_true_eq]
+    intro hlt
+    have hge : ¬(n >= d) := by omega
+    simp only [hge, ↓reduceIte]
+  | lam body ih =>
+    simp only [isClosed.go, freeVars.go]
+    exact ih (d + 1)
+  | app t1 t2 ih1 ih2 =>
+    simp only [isClosed.go, freeVars.go, Bool.and_eq_true]
+    intro ⟨h1, h2⟩
+    have e1 := ih1 d h1
+    have e2 := ih2 d h2
+    simp only [e1, e2, List.append_nil]
+
 /-- A closed term has no free variables -/
 theorem closed_no_free_vars (t : Term) : isClosed t = true → freeVars t = [] := by
   intro h
-  simp only [isClosed, freeVars] at *
-  sorry -- This requires more machinery to prove properly
+  simp only [isClosed] at h
+  simp only [freeVars]
+  have hem := isClosed_go_implies_freeVars_go_empty t 0 h
+  rw [hem]
+  rfl
 
 /-- Combinators are closed -/
 theorem id_closed : isClosed idCombinator = true := rfl

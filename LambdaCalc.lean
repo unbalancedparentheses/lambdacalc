@@ -4,3 +4,4 @@
 import LambdaCalc.Basic
 import LambdaCalc.Proofs
 import LambdaCalc.Tests
+import LambdaCalc.REPL

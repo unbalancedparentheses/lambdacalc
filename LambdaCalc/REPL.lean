@@ -14,10 +14,7 @@ open Term
 
 def indexToName (n : Nat) : String :=
   let letters := #["x", "y", "z", "w", "v", "u", "t", "s", "r", "q", "p", "n", "m"]
-  if n < letters.size then
-    letters[n]!
-  else
-    s!"x{n}"
+  letters.getD n s!"x{n}"
 
 partial def prettyPrint (t : Term) : String :=
   go t 0 0
@@ -44,21 +41,31 @@ partial def prettyPrintDB (t : Term) : String :=
 -/
 
 def builtins : List (String × Term) := [
+  -- Combinators
   ("I", idCombinator), ("K", kCombinator), ("S", sCombinator),
   ("B", bCombinator), ("C", cCombinator), ("W", wCombinator),
+  -- Booleans
   ("true", churchTrue), ("false", churchFalse),
   ("and", churchAnd), ("or", churchOr), ("not", churchNot), ("if", churchIf),
+  -- Arithmetic
   ("succ", churchSucc), ("pred", churchPred),
   ("add", churchAdd), ("mul", churchMult), ("exp", churchExp), ("sub", churchSub),
-  ("zero?", churchIsZero), ("leq", churchLeq),
+  -- Comparisons
+  ("zero?", churchIsZero), ("leq", churchLeq), ("eq", churchEq), ("gt", churchGt),
+  -- Pairs
   ("pair", churchPair), ("fst", churchFst), ("snd", churchSnd),
+  -- Fixed-point combinators
   ("Y", yCombinator), ("Z", zCombinator), ("theta", thetaCombinator),
+  -- Recursive functions
+  ("factorial", churchFactorial), ("fib", churchFib),
+  -- Scott-encoded lists
   ("nil", scottNil), ("cons", scottCons),
   ("null?", scottIsNil), ("head", scottHead), ("tail", scottTail),
   ("length", scottLength), ("append", scottAppend), ("map", scottMap),
   ("foldr", scottFoldr), ("reverse", scottReverse),
   ("sum", scottSum), ("product", scottProduct), ("nth", scottNth),
-  ("omega", omega)
+  -- Divergence
+  ("omega", omega), ("Omega", bigOmega)
 ]
 
 def lookupBuiltin (name : String) : Option Term :=
@@ -223,7 +230,7 @@ def execCmd (c : Cmd) : IO String := do
     match lookupBuiltin n with
     | some t => return s!"{n} = {prettyPrint t}"
     | none => return s!"Unknown: {n}"
-  | .list => return "Built-ins:\n  Combinators: I K S B C W\n  Booleans: true false and or not if\n  Arithmetic: succ pred add mul exp sub zero? leq\n  Pairs: pair fst snd\n  Fixed-point: Y Z theta\n  Lists: nil cons null? head tail length append map foldr reverse sum product nth\n  Other: omega\n  Numerals: 0, 1, 2, ..."
+  | .list => return "Built-ins:\n  Combinators: I K S B C W\n  Booleans: true false and or not if\n  Arithmetic: succ pred add mul exp sub\n  Comparisons: zero? leq eq gt\n  Pairs: pair fst snd\n  Fixed-point: Y Z theta\n  Recursive: factorial fib\n  Lists: nil cons null? head tail length append map foldr reverse sum product nth\n  Divergence: omega Omega\n  Numerals: 0, 1, 2, ..."
   | .help => return "Lambda Calculus REPL\n\nSyntax:\n  λx. body  or  \\x. body\n  f x (application)\n  (term)\n\nCommands:\n  :reduce <term>  Reduce to normal form\n  :step <term>    Single step\n  :trace <term>   Show trace\n  :parse <term>   Show de Bruijn\n  :type <name>    Show built-in\n  :list           List built-ins\n  :help           This help\n  :quit           Exit\n\nExamples:\n  (\\x. x) I\n  add 2 3\n  :trace K I omega"
   | .quit => return ""
   | .eval ts =>
