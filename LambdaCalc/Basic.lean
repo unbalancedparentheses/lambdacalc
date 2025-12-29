@@ -569,6 +569,55 @@ def scottHead : Term :=
 def scottTail : Term :=
   lam (app (app (var 0) scottNil) (lam (lam (var 0))))
 
+-- length: Y (λf. λl. l 0 (λh. λt. succ (f t)))
+def scottLength : Term :=
+  app yCombinator
+    (lam (lam (app (app (var 0) churchZero)
+      (lam (lam (app churchSucc (app (var 3) (var 0))))))))
+
+-- append: Y (λf. λl1. λl2. l1 l2 (λh. λt. cons h (f t l2)))
+def scottAppend : Term :=
+  app yCombinator
+    (lam (lam (lam (app (app (var 1) (var 0))
+      (lam (lam (app (app scottCons (var 1))
+        (app (app (var 4) (var 0)) (var 2)))))))))
+
+-- map: Y (λf. λg. λl. l nil (λh. λt. cons (g h) (f g t)))
+def scottMap : Term :=
+  app yCombinator
+    (lam (lam (lam (app (app (var 0) scottNil)
+      (lam (lam (app (app scottCons (app (var 3) (var 1)))
+        (app (app (var 4) (var 3)) (var 0)))))))))
+
+-- foldr: Y (λf. λg. λz. λl. l z (λh. λt. g h (f g z t)))
+def scottFoldr : Term :=
+  app yCombinator
+    (lam (lam (lam (lam (app (app (var 0) (var 1))
+      (lam (lam (app (app (var 4) (var 1))
+        (app (app (app (var 5) (var 4)) (var 3)) (var 0))))))))))
+
+-- reverse: Y (λf. λacc. λl. l acc (λh. λt. f (cons h acc) t))
+def scottReverse : Term :=
+  app yCombinator
+    (lam (lam (lam (app (app (var 0) (var 1))
+      (lam (lam (app (app (var 4) (app (app scottCons (var 1)) (var 3))) (var 0))))))))
+
+-- sum: foldr add 0 l
+def scottSum : Term :=
+  lam (app (app (app scottFoldr churchAdd) churchZero) (var 0))
+
+-- product: foldr mul 1 l
+def scottProduct : Term :=
+  lam (app (app (app scottFoldr churchMult) churchOne) (var 0))
+
+-- nth: get element at index n (0-based)
+-- Y (λf. λn. λl. l 0 (λh. λt. (zero? n) h (f (pred n) t)))
+def scottNth : Term :=
+  app yCombinator
+    (lam (lam (lam (app (app (var 0) churchZero)
+      (lam (lam (app (app (app churchIsZero (var 3)) (var 1))
+        (app (app (var 4) (app churchPred (var 3))) (var 0)))))))))
+
 /-
   Utility functions for testing
 -/

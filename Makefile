@@ -24,8 +24,12 @@ clean:
 	rm -rf .lake
 
 # Start Lean REPL with project loaded
-repl:
+lean-repl:
 	lake env lean
+
+# Start Lambda Calculus REPL
+repl: build
+	.lake/build/bin/lambdacalc_repl
 
 # Update Lake dependencies
 update-deps:
@@ -42,6 +46,7 @@ info:
 	@echo "  LambdaCalc/Basic.lean  - Core implementation"
 	@echo "  LambdaCalc/Proofs.lean - Formal proofs"
 	@echo "  LambdaCalc/Tests.lean  - Tests and examples"
+	@echo "  LambdaCalc/REPL.lean   - Interactive REPL"
 	@echo ""
 	@echo "Usage:"
 	@echo "  nix-shell              - Enter development shell"
@@ -54,7 +59,8 @@ help:
 	@echo "  make test         - Build and verify all proofs"
 	@echo "  make check        - Type-check the project"
 	@echo "  make clean        - Remove build artifacts"
-	@echo "  make repl         - Start Lean REPL"
+	@echo "  make repl         - Start Lambda Calculus REPL"
+	@echo "  make lean-repl    - Start Lean REPL"
 	@echo "  make update-deps  - Update Lake dependencies"
 	@echo "  make info         - Show project information"
 	@echo ""
